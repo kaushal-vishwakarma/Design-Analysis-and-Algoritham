@@ -1,0 +1,232 @@
+#include <stdio.h>
+#include <stdlib.h>
+// Kaushal kumar 25070521041
+// Function to find the next power of 2
+int get_next_power_of_2(int n) {
+    int power = 1;
+    while (power < n) {
+        power *= 2;
+    }
+    return power;
+}
+
+// Dynamically allocate memory for a square matrix of size n x n
+int** allocate_matrix(int n) {
+    int** matrix = (int**)malloc(n * sizeof(int*));
+    for (int i = 0; i < n; i++) {
+        matrix[i] = (int*)calloc(n, sizeof(int)); // initialized to 0
+    }
+    return matrix;
+}
+
+// Free allocated matrix memory
+void free_matrix(int** matrix, int n) {
+    for (int i = 0; i < n; i++) {
+        free(matrix[i]);
+    }
+    free(matrix);
+}
+
+// Matrix helper utilities: Add and Subtract
+void add_matrices(int** A, int** B, int** C, int size) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            C[i][j] = A[i][j] + B[i][j];
+        }
+    }
+}
+
+void subtract_matrices(int** A, int** B, int** C, int size) {
+    for (int i = 0; i < size; i++) {
+        for (int j = 0; j < size; j++) {
+            C[i][j] = A[i][j] - B[i][j];
+        }
+    }
+}
+
+// Recursive Strassen Multiplication function
+void strassen_recursive(int** A, int** B, int** C, int size) {
+    // Base Case: 1x1 matrix
+    if (size == 1) {
+        C[0][0] = A[0][0] * B[0][0];
+        return;
+    }
+
+    int new_size = size / 2;
+
+    // Submatrices blocks
+    int **A11 = allocate_matrix(new_size), **A12 = allocate_matrix(new_size);
+    int **A21 = allocate_matrix(new_size), **A22 = allocate_matrix(new_size);
+    int **B11 = allocate_matrix(new_size), **B12 = allocate_matrix(new_size);
+    int **B21 = allocate_matrix(new_size), **B22 = allocate_matrix(new_size);
+
+    // Intermediate block sums/differences
+    int **ARes = allocate_matrix(new_size), **BRes = allocate_matrix(new_size);
+
+    // 7 Strassen products
+    int **P1 = allocate_matrix(new_size), **P2 = allocate_matrix(new_size);
+    int **P3 = allocate_matrix(new_size), **P4 = allocate_matrix(new_size);
+    int **P5 = allocate_matrix(new_size), **P6 = allocate_matrix(new_size);
+    int **P7 = allocate_matrix(new_size);
+
+    // Result submatrices
+    int **C11 = allocate_matrix(new_size), **C12 = allocate_matrix(new_size);
+    int **C21 = allocate_matrix(new_size), **C22 = allocate_matrix(new_size);
+
+    // Divide matrices A and B into 4 submatrices each
+    for (int i = 0; i < new_size; i++) {
+        for (int j = 0; j < new_size; j++) {
+            A11[i][j] = A[i][j];
+            A12[i][j] = A[i][j + new_size];
+            A21[i][j] = A[i + new_size][j];
+            A22[i][j] = A[i + new_size][j + new_size];
+
+            B11[i][j] = B[i][j];
+            B12[i][j] = B[i][j + new_size];
+            B21[i][j] = B[i + new_size][j];
+            B22[i][j] = B[i + new_size][j + new_size];
+        }
+    }
+
+    // P1 = (A11 + A22) * (B11 + B22)
+    add_matrices(A11, A22, ARes, new_size);
+    add_matrices(B11, B22, BRes, new_size);
+    strassen_recursive(ARes, BRes, P1, new_size);
+
+    // P2 = (A21 + A22) * B11
+    add_matrices(A21, A22, ARes, new_size);
+    strassen_recursive(ARes, B11, P2, new_size);
+
+    // P3 = A11 * (B12 - B22)
+    subtract_matrices(B12, B22, BRes, new_size);
+    strassen_recursive(A11, BRes, P3, new_size);
+
+    // P4 = A22 * (B21 - B11)
+    subtract_matrices(B21, B11, BRes, new_size);
+    strassen_recursive(A22, BRes, P4, new_size);
+
+    // P5 = (A11 + A12) * B22
+    add_matrices(A11, A12, ARes, new_size);
+    strassen_recursive(ARes, B22, P5, new_size);
+
+    // P6 = (A21 - A11) * (B11 + B12)
+    subtract_matrices(A21, A11, ARes, new_size);
+    add_matrices(B11, B12, BRes, new_size);
+    strassen_recursive(ARes, BRes, P6, new_size);
+
+    // P7 = (A12 - A22) * (B21 + B22)
+    subtract_matrices(A12, A22, ARes, new_size);
+    add_matrices(B21, B22, BRes, new_size);
+    strassen_recursive(ARes, BRes, P7, new_size);
+
+    // Constructing C11, C12, C21, C22 from P1-P7
+    // C11 = P1 + P4 - P5 + P7
+    add_matrices(P1, P4, ARes, new_size);
+    subtract_matrices(ARes, P5, BRes, new_size);
+    add_matrices(BRes, P7, C11, new_size);
+
+    // C12 = P3 + P5
+    add_matrices(P3, P5, C12, new_size);
+
+    // C21 = P2 + P4
+    add_matrices(P2, P4, C21, new_size);
+
+    // C22 = P1 - P2 + P3 + P6
+    subtract_matrices(P1, P2, ARes, new_size);
+    add_matrices(ARes, P3, BRes, new_size);
+    add_matrices(BRes, P6, C22, new_size);
+
+    // Combine submatrices back into C
+    for (int i = 0; i < new_size; i++) {
+        for (int j = 0; j < new_size; j++) {
+            C[i][j] = C11[i][j];
+            C[i][j + new_size] = C12[i][j];
+            C[i + new_size][j] = C21[i][j];
+            C[i + new_size][j + new_size] = C22[i][j];
+        }
+    }
+
+    // Free local block allocations
+    free_matrix(A11, new_size); free_matrix(A12, new_size);
+    free_matrix(A21, new_size); free_matrix(A22, new_size);
+    free_matrix(B11, new_size); free_matrix(B12, new_size);
+    free_matrix(B21, new_size); free_matrix(B22, new_size);
+    free_matrix(ARes, new_size); free_matrix(BRes, new_size);
+    free_matrix(P1, new_size); free_matrix(P2, new_size);
+    free_matrix(P3, new_size); free_matrix(P4, new_size);
+    free_matrix(P5, new_size); free_matrix(P6, new_size);
+    free_matrix(P7, new_size);
+    free_matrix(C11, new_size); free_matrix(C12, new_size);
+    free_matrix(C21, new_size); free_matrix(C22, new_size);
+}
+
+int main() {
+    int r1, c1;
+    if (scanf("%d %d", &r1, &c1) != 2) return 0;
+
+    // Temporary storage for Matrix A components
+    int temp_A[r1][c1];
+    for (int i = 0; i < r1; i++) {
+        for (int j = 0; j < c1; j++) {
+            scanf("%d", &temp_A[i][j]);
+        }
+    }
+
+    int r2, c2;
+    if (scanf("%d %d", &r2, &c2) != 2) return 0;
+
+    // Verification Step: Column of A must match Row of B
+    if (c1 != r2) {
+        printf("Invalid input\n");
+        return 0;
+    }
+
+    // Matrix Multiplication is valid, continue reading Matrix B
+    int temp_B[r2][c2];
+    for (int i = 0; i < r2; i++) {
+        for (int j = 0; j < c2; j++) {
+            scanf("%d", &temp_B[i][j]);
+        }
+    }
+
+    // Determine the largest dimension required for padding to the nearest 2^k
+    int max_dim = r1;
+    if (c1 > max_dim) max_dim = c1;
+    if (c2 > max_dim) max_dim = c2;
+    int padded_size = get_next_power_of_2(max_dim);
+
+    // Allocate square padded structures
+    int** A = allocate_matrix(padded_size);
+    int** B = allocate_matrix(padded_size);
+    int** C = allocate_matrix(padded_size);
+
+    // Populate data with structural padding
+    for (int i = 0; i < r1; i++) {
+        for (int j = 0; j < c1; j++) {
+            A[i][j] = temp_A[i][j];
+        }
+    }
+    for (int i = 0; i < r2; i++) {
+        for (int j = 0; j < c2; j++) {
+            B[i][j] = temp_B[i][j];
+        }
+    }
+
+    // Execute Strassen's Algorithm
+    strassen_recursive(A, B, C, padded_size);
+
+    // FIXED PRINTING LOOP: Every single integer is followed by a space
+    for (int i = 0; i < r1; i++) {
+        for (int j = 0; j < c2; j++) {
+            printf("%d ", C[i][j]);
+        }
+        printf("\n");
+    }
+
+    // Cleanup resources
+    free_matrix(A, padded_size);
+    free_matrix(B, padded_size);
+    free_matrix(C, padded_size);
+
+    return 0;
+}
